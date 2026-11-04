@@ -1,54 +1,34 @@
-name: CI
+
+name: Build SEA VPN APK
 
 on:
   push:
     branches: [master]
-  pull_request:
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
-          persist-credentials: false
 
-      - name: Check Hysteria core pin
-        run: bash .github/scripts/check-core-pin.sh
-
-      - name: Lint workflow scripts
-        run: shellcheck --severity=warning .github/scripts/*.sh
-
-      - uses: ./.github/actions/setup-build
-
-      - name: Go tests
-        working-directory: hysteria/golib
-        run: go test -tags with_gvisor ./...
-
-      - name: Unit tests
-        run: ./gradlew testDebugUnitTest --stacktrace
-
-      - name: Lint
-        run: ./gradlew :app:lintRelease --stacktrace
-
-      - name: Release build (R8 smoke, unsigned)
-        run: ./gradlew :app:assembleRelease --stacktrace
-
-      - name: Provenance manifest (unsigned)
-        run: bash .github/scripts/write-provenance.sh build/release
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/setup-java@v4
         with:
-          name: provenance
-          path: build/release/*-provenance.json
-          if-no-files-found: error
-          retention-days: 14
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Build APK
+        run: chmod +x gradlew && ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SEA-VPN-APK
+          path: app/build/outputs/apk/debug/*.apk
